@@ -1,9 +1,7 @@
 # Veritas — Fake News & Credibility Detection System
 
-**Type:** Mini Project, Semester 7 BE (Computer Science - Design), Mumbai University  
-**Goal:** Classify news articles as *Likely Reliable* or *Likely Unreliable (Fake/Sensational)* using Natural Language Processing (NLP), linguistic feature engineering, and Machine Learning with an interactive web interface.
 
----
+
 
 ## 📌 Project Overview & Framing
 
