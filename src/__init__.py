@@ -1,0 +1,3 @@
+"""
+Fake News Classifier package
+"""

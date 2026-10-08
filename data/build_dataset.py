@@ -1,0 +1,266 @@
+"""
+Dataset preparation script for Fake News Classifier.
+Generates an extensive, curated dataset of real and fake articles covering
+politics, science, health, technology, international affairs, and entertainment.
+Also provides utility to ingest external datasets (ISOT, Kaggle, FakeNewsNet) if placed in data/raw/.
+"""
+
+import os
+import pandas as pd
+import numpy as np
+
+CURATED_DATA = [
+    # REAL NEWS ARTICLES (label = 0)
+    {
+        "title": "Federal Reserve Holds Interest Rates Steady Amid Cooling Inflation Data",
+        "text": "The Federal Reserve decided on Wednesday to keep its benchmark interest rate unchanged in the range of 5.25% to 5.50%. Federal Reserve Chairman Jerome Powell noted during the post-meeting press conference that while inflation has decelerated significantly over the past six months, policymakers require more sustained evidence before reducing borrowing costs. According to the Bureau of Labor Statistics, the Consumer Price Index rose by 3.1 percent on an annualized basis last month, aligning with economic consensus estimates. Financial market analysts from Goldman Sachs and JPMorgan expect rate cuts could begin later in the year, provided employment figures remain resilient.",
+        "label": 0
+    },
+    {
+        "title": "NASA James Webb Space Telescope Observes Atmospheric Compounds on Exoplanet",
+        "text": "Astronomers analyzing spectroscopic data collected by NASA's James Webb Space Telescope have identified water vapor, sulfur dioxide, and carbon dioxide in the atmosphere of an exoplanet located 700 light-years away from Earth. The findings, published in the journal Nature, provide unprecedented insight into the chemical composition of giant gas planets orbiting distant stars. 'These observations demonstrate the transformative capability of the observatory's near-infrared instruments,' stated Dr. Natalie Batalha, lead investigator from the University of California. The research team emphasized that while the planet cannot support life due to extreme surface temperatures exceeding 1,000 degrees Celsius, the methodology paves the way for studying smaller, potentially habitable rocky planets.",
+        "label": 0
+    },
+    {
+        "title": "World Health Organization Reports Significant Global Drop in Malaria Deaths",
+        "text": "The World Health Organization announced on Thursday that widespread deployment of newer malaria vaccines combined with insecticide-treated bed nets has contributed to a 14 percent decline in childhood mortality across endemic regions in Sub-Saharan Africa. Dr. Tedros Adhanom Ghebreyesus, Director-General of the WHO, commended public health agencies for coordinating immunization campaigns despite logistical challenges in rural areas. According to clinical trial records and regional surveillance data, over 2 million children have received the R21 vaccine over the past twelve months. Researchers at Oxford University noted that international funding and local community health partnerships remain vital to achieving complete eradication goals by 2035.",
+        "label": 0
+    },
+    {
+        "title": "European Union Reaches Landmark Agreement on Artificial Intelligence Regulations",
+        "text": "Negotiators from the European Parliament and member states concluded discussions early Friday on the Artificial Intelligence Act, establishing the world's first comprehensive legal framework governing AI systems. Under the rules, general-purpose AI models deemed to pose systemic risks will face mandatory transparency requirements, bias evaluations, and rigorous energy efficiency reporting. European Commissioner Thierry Breton stated that the legislation seeks to balance fundamental human rights protections with technological innovation. Technology industry representatives acknowledged the need for safety guardrails but urged regulators to provide clear compliance guidelines ahead of the 2026 enforcement deadline.",
+        "label": 0
+    },
+    {
+        "title": "Renewable Energy Capacity Grew by Record 50% Worldwide in Past Year, IEA States",
+        "text": "Global renewable energy capacity additions increased by nearly 50 percent last year, marking the fastest growth rate observed in the past two decades, according to a report published by the International Energy Agency (IEA). The expansion was predominantly driven by solar photovoltaic installations across China, Europe, and North America. Executive Director Fatih Birol emphasized that declining manufacturing costs for solar panels and supportive government policies are accelerating the transition away from fossil fuels. However, the report cautioned that developing economies require substantial financing mechanisms to upgrade electrical grid infrastructure to handle variable renewable power sources effectively.",
+        "label": 0
+    },
+    {
+        "title": "Supreme Court Hears Arguments on Federal Agency Regulatory Authority",
+        "text": "The Supreme Court on Wednesday heard oral arguments in a high-profile case challenging the long-standing legal doctrine known as Chevron deference, which instructs courts to defer to federal administrative agencies when interpreting ambiguous statutory language. Attorneys representing commercial fishing enterprises argued that the doctrine improperly diminishes judicial authority, while the Solicitor General contended that specialized agencies possess scientific and technical expertise essential for enforcing federal safety and environmental protections. Observers noted pointed questions from several justices regarding the proper division of power between administrative officials and federal judges.",
+        "label": 0
+    },
+    {
+        "title": "Automakers Accelerate Battery Recycling Initiatives to Secure Critical Minerals",
+        "text": "Major global automakers are investing billions of dollars in battery recycling technology to reclaim lithium, nickel, and cobalt from end-of-life electric vehicles. According to industry data released by Benchmark Mineral Intelligence, recycled materials could account for nearly 20 percent of new battery production demand within the next decade. Executives at Volvo and Ford confirmed pilot recycling plants in Europe and North America that achieve recovery efficiencies exceeding 95 percent. Environmental groups welcomed the developments, noting that secondary recovery reduces mining impacts and stabilizes domestic supply chains against geopolitical volatility.",
+        "label": 0
+    },
+    {
+        "title": "Retail Sales Remain Steady in First Quarter Despite Elevated Borrowing Costs",
+        "text": "Department of Commerce figures released Tuesday showed that domestic retail spending rose 0.7 percent last month, exceeding forecasters' expectations and signaling ongoing consumer resilience. Strong gains in e-commerce and dining establishments offset slight contractions in hardware and furniture retailers. Economists attributed the steady demand to sustained wage gains and historically low unemployment rates. However, Federal Reserve officials reiterated caution, noting that strong consumer demand could keep core services inflation elevated longer than anticipated.",
+        "label": 0
+    },
+    {
+        "title": "Scientists Develop Ultra-Efficient Desalination Membrane Powered by Solar Heat",
+        "text": "Engineering researchers at MIT and Shanghai Jiao Tong University have engineered a multi-stage solar desalination apparatus capable of converting seawater into potable water at a rate higher than previously recorded systems. The device utilizes localized solar heating and micro-channel fluid dynamics to prevent salt crystallization on the membrane surface. In testing conducted along coastal waters, the system delivered reliable drinking water meeting all sanitary standards without requiring electrical grid connection. Lead author Dr. Lenan Zhang stated that the technology offers promising solutions for arid coastal communities struggling with severe freshwater scarcity.",
+        "label": 0
+    },
+    {
+        "title": "Global Semiconductor Alliance Announces Cross-Border Chip Packaging Standards",
+        "text": "Leading chipmakers and equipment suppliers have formalized an open standard for advanced chiplet packaging, facilitating interoperability between microprocessors produced by different semiconductor foundries. The Universal Chiplet Interconnect Express consortium announced that the version 2.0 specifications establish standardized electrical interfaces and thermal dissipation guidelines. Analysts note that modular packaging allows semiconductor firms to lower manufacturing costs while improving compute density for cloud computing infrastructure and mobile devices.",
+        "label": 0
+    },
+    {
+        "title": "Treasury Department Issues New Guidelines for Clean Energy Tax Credits",
+        "text": "The United States Department of the Treasury released guidance detailing the qualifications for domestic manufacturing subsidies and clean electricity tax incentives under the Inflation Reduction Act. The guidelines define prevailing wage requirements, apprenticeship ratios, and domestic content thresholds needed to claim the full 30 percent investment tax credit. Treasury Secretary Janet Yellen remarked that the rules provide certainty for long-term private capital investments in solar, wind, and battery manufacturing facilities across the nation.",
+        "label": 0
+    },
+    {
+        "title": "Public Health Authorities Urge Annual Vaccinations Ahead of Winter Respiratory Season",
+        "text": "Health officials from the Centers for Disease Control and Prevention advised residents to receive their updated annual influenza and COVID-19 immunizations prior to the upcoming winter months. Epidemiologists highlighted clinical surveillance data showing that simultaneous administration of both vaccines is safe and produces robust neutralizing antibody titers. State health departments are coordinating mobile clinics in nursing facilities and public community centers to ensure vulnerable populations have convenient access.",
+        "label": 0
+    },
+    {
+        "title": "Civil Aviation Organization Adopts Stricter Emissions Tracking Framework",
+        "text": "Delegates at the International Civil Aviation Organization assembly voted in favor of mandatory carbon accounting rules for commercial international flights operating above 10,000 meters. The framework mandates airlines to measure lifecycle greenhouse gas reductions achieved through sustainable aviation fuel blends. While airline associations acknowledged the financial costs associated with green fuel adoption, environmental monitors stressed that decarbonizing commercial aviation is essential to meeting net-zero transport targets.",
+        "label": 0
+    },
+    {
+        "title": "Urban Transit Authorities Expand Electric Bus Fleets in Major Metropolitan Areas",
+        "text": "Public transit agencies in Chicago, London, and Tokyo confirmed procurement contracts for over 1,500 battery-electric city buses scheduled for delivery over the next twenty-four months. Municipal transit directors reported that zero-emission vehicles lower fleet maintenance expenses by approximately 30 percent while eliminating tailpipe emissions in dense downtown corridors. Grid operators are cooperating with bus depots to install high-voltage overnight chargers designed to draw energy during off-peak demand hours.",
+        "label": 0
+    },
+    {
+        "title": "Archaeologists Uncover Intact Roman Mosaic During Subway Infrastructure Expansion",
+        "text": "Excavation teams working on the metropolitan transit expansion in Rome unearthed a pristine 2nd-century Roman floor mosaic depicting mythological scenes of marine deities. The Italian Ministry of Culture confirmed that the mosaic will be carefully preserved, stabilized by conservators, and integrated into a planned underground museum concourse within the station. Chief archaeologist Dr. Francesca Rossi explained that the discovery provides valuable architectural context regarding luxury suburban villas from the Antonine dynasty.",
+        "label": 0
+    },
+
+    # FAKE / UNRELIABLE / SENSATIONAL NEWS ARTICLES (label = 1)
+    {
+        "title": "SHOCKING SECRET: Secret World Government Will FORCE Everyone Into Digital Microchips By Midnight!",
+        "text": "YOU WON'T BELIEVE WHAT INSIDERS JUST LEAKED! Corrupt globalist elites have secretly signed a clandestine treaty in Switzerland to eliminate all paper cash and FORCE every single human being on Earth to be implanted with biometric microchips before midnight! Mainstream media is completely SILENT because they are controlled by the shadow regime! Whistleblowers who tried to speak out have disappeared overnight! If you refuse the chip, your bank accounts will be confiscated immediately and you will be barred from buying groceries! SHARE THIS EVERYWHERE BEFORE IT GETS CENSORED AND PULLED DOWN FOREVER! WAKE UP PEOPLE!",
+        "label": 1
+    },
+    {
+        "title": "Miracle Kitchen Spice Completely CURES All Stages Of Cancer in 24 Hours, Big Pharma Panicking!",
+        "text": "A revolutionary cure for all forms of cancer has been deliberately hidden from the public by corrupt pharmaceutical executives who make trillions off chemotherapy treatments! A top secret laboratory discovered that common kitchen turmeric mixed with crushed apple seeds destroys 100% of malignant cancer cells within exactly 24 hours with ZERO side effects! Doctors are terrified of losing their medical licenses if they prescribe this natural miracle remedy! Greedy billion-dollar hospital conglomerates are suing to suppress the truth, but insiders have finally leaked the natural cure recipe! Do not let Big Pharma poison your family, drink this every morning!",
+        "label": 1
+    },
+    {
+        "title": "LEAKED AUDIO EXPOSES: World Leaders Caught Admitting Moon Landing Was Filmed in Secret Hollywood Bunker!",
+        "text": "AN EXPLOSIVE NEW AUDIO RECORDING PROVES WHAT WE ALWAYS SUSPECTED! Top government officials were caught on a hot microphone laughing about how the 1969 lunar landings were totally fabricated inside a classified film soundstage in Nevada directed by Stanley Kubrick! Insiders claim no astronaut has ever flown into space because of an impenetrable invisible energy barrier surrounding Earth! The corrupt establishment has laundered trillions of taxpayer dollars into secret private slush funds while feeding fake computerized images to the sheeple! Read the terrifying transcripts before the deep state scrubs the internet!",
+        "label": 1
+    },
+    {
+        "title": "5G Cell Towers Are Transmitting Mind-Control Frequencies That Alter Human DNA, Leaked Memo Warns",
+        "text": "TERRIFYING PROOF HAS FINALLY SURFACED! High-ranking telecommunications insiders have blown the whistle on 5G wireless networks, revealing that millimeter waves are tuned specifically to resonate with human brain frequencies to induce compliance, obedient behavior, and suppress independent thought! Military contractors designed the antennae to alter cellular DNA and trigger mass headaches and fatigue! Corrupt politicians accepted millions in bribes to install these radiation death towers right next to elementary schools! Protect your household immediately with aluminum shield curtains before it is too late!",
+        "label": 1
+    },
+    {
+        "title": "BREAKING: Secret Military Tribunal Convicts All Corrupt Billionaires In Midnight Trial, Arrests Imminent!",
+        "text": "IT IS FINALLY HAPPENING! Patriotic military commandos executed surprise midnight raids across luxury penthouses and private islands, arresting corrupt billionaires and rogue politicians on treason charges! Over 800 classified sealed indictments have finally unsealed, and military tribunals operating from undisclosed secure naval vessels have handed down guilty verdicts for everyone involved! The corrupt mainstream propaganda machine refuses to broadcast the footage, but freedom fighters on encrypted channels confirm military aircraft are surrounding corporate headquarters! Justice is here!",
+        "label": 1
+    },
+    {
+        "title": "Ancient Alien Mothership Spotted Entering Solar System, NASA Secretly Prepares Mass Evacuation!",
+        "text": "A massive artificial extraterrestrial spacecraft spanning fifty miles wide has been detected decelerating past Jupiter and heading directly towards Earth! Panicked NASA scientists held emergency closed-door meetings with billionaires to secure spots on underground bunkers and orbital escape shuttles, leaving regular citizens in the dark! Satellite feeds showing the craft were immediately cut by government censors, but rogue amateur astronomers managed to capture the glowing crystalline propulsion drives! The arrival date is set for next Tuesday! The truth cannot be silenced any longer!",
+        "label": 1
+    },
+    {
+        "title": "THIS SIMPLE TRICK Drops 40 Pounds in 3 Days While You Sleep, Personal Trainers Are FURIOUS!",
+        "text": "Fitness gurus and diet pill corporations are trembling in fear! A rogue biochemist who was fired from a major pharmaceutical company has revealed a shocking household beverage that incinerates pure abdominal fat in 72 hours without diet or exercise! You can eat greasy pizza, ice cream, and cheeseburgers all day long and wake up 10 pounds lighter every single morning! The multi-billion dollar weight loss industry is trying to take down this video because it will make gyms and dieticians obsolete overnight! Click the link below before corrupt corporate lawyers take it offline!",
+        "label": 1
+    },
+    {
+        "title": "UNBELIEVABLE: Volcano Eruption Triggered By Secret Underground Laser Weapons Program!",
+        "text": "DO NOT BELIEVE THE FAKE NEWS LIES! The recent volcanic explosion was not a natural geological phenomenon at all! Eyewitnesses in the area reported seeing blinding purple laser beams shooting down from military satellites hours before the caldera blew apart! Classified government seismic manipulation technologies code-named Project Hades have been tested to weaponize natural catastrophes against unsuspecting nations! Insiders warn that artificial earthquakes are planned next! Share this urgent report with everyone you love before the grid goes dark!",
+        "label": 1
+    },
+    {
+        "title": "REVEALED: Famous Politician Cloned Five Times, Robotic Double Spotted Glitching On Live Television!",
+        "text": "SHOCKING VIDEO PROOF THAT WILL BLOW YOUR MIND! Millions of eagle-eyed viewers watched in horror as a prominent political figure froze motionless on live television, with their left eyeball rolling in circles while robotic clicking sounds emanated from their chest microphone! Anonymous hospital workers admit the original individual passed away years ago, and shadow controllers have been deploying cybernetic clone duplicates powered by classified synthetic biology! Notice how their earlobes change shape between appearances? The mainstream media is mocking everyone who points out the obvious truth!",
+        "label": 1
+    },
+    {
+        "title": "Scientists Discover Drinking Sea Water Completely Eliminates Aging, Bottled Water Companies PANICKING!",
+        "text": "A group of independent holistic practitioners who broke away from corrupt medical institutions have discovered that boiling raw sea water with lemon peels creates a miraculous fountain-of-youth elixir that reverses wrinkles and restores youthful organ function instantly! Major beverage corporations and cosmetic brands are lobbying corrupt senators to ban seawater consumption because they will lose trillions! Over 50,000 people have already reversed grey hair and joint pain in under a week! Discover the forbidden formula before it is confiscated!",
+        "label": 1
+    },
+    {
+        "title": "Secret Clause Hidden In Electric Vehicle Software Allows Governments To Remotely Shut Down Your Car!",
+        "text": "BEWARE OF ELECTRIC CAR TRAPS! A brave whistleblower from a leading electric vehicle manufacturer has leaked confidential firmware blueprints showing that all modern EV batteries contain remote government kill switches! At any moment, bureaucrats can remotely lock your vehicle doors, drive your vehicle to detention facilities, or shut off your brakes while traveling on highways! Gas cars are being banned specifically so the deep state can trap citizens inside digital concentration zones! Resist the climate hoax and protect your freedom before your car becomes your prison cell!",
+        "label": 1
+    },
+    {
+        "title": "Ancient Golden City With Trillions in Lost Treasure Discovered Beneath Antarctic Ice Sheet!",
+        "text": "EXPLOSIVE FINDING THE POWERS THAT BE DO NOT WANT YOU TO WITNESS! High-resolution radar satellites have penetrated two miles of Antarctic ice, exposing a sprawling megalithic civilization crafted entirely from solid gold and glowing crystal spires! Military special operations units have established quarantine perimeters and are secretly shipping tons of ancient gold bullion to offshore Swiss banks! Why is tourism to Antarctica strictly restricted? Because they are hoarding the greatest archaeological discovery in human history! Read the leaked explorer journal here!",
+        "label": 1
+    },
+    {
+        "title": "BOMBSHELL: New Airborne Chemicals Will Force Citizens To Surrender Private Property Rights!",
+        "text": "ALERT TO ALL CITIZENS! High-altitude aircraft have been caught dispensing aerosol chemicals designed to dull critical thinking and induce extreme submissiveness in the population! Documents obtained through rogue intelligence contacts indicate the project aims to facilitate the complete confiscation of private homes and private land! Why do sky streaks linger for hours instead of evaporating? Because they are not normal condensation trails! Buy respirator filters now and do not let the corrupt establishment strip your liberties!",
+        "label": 1
+    },
+    {
+        "title": "Drinking Common Tap Water Causes Sudden Magnetism In Humans, Shocking Video Shows Spoons Sticking!",
+        "text": "YOU HAVE TO SEE THIS TO BELIEVE IT! Millions of citizens across five states have reported that steel spoons, coins, and keys are physically adhering to their forearms and foreheads after taking showers! Independent testing of municipal water supplies discovered unlisted magnetic graphene nanoparticles added by rogue agencies to track personal movements! Local utilities deny the allegations, calling it 'static electricity,' but hundreds of viral videos show heavy metal objects sticking tightly to human skin! Purify your water with this secret magnet filter immediately!",
+        "label": 1
+    },
+    {
+        "title": "Global Banking Cartel Plans To Delete All Retirement Savings Accounts By Next Friday!",
+        "text": "EMERGENCY WARNING FOR RETIREES AND WORKERS! High-level Wall Street whistleblowers have revealed that an unprecedented computer glitch will be deliberately triggered next Friday to wipe out every pension, 401k, and private savings account across sixty nations! Financial tycoons have already converted their paper wealth into offshore gold vaults and private subterranean compounds while telling working-class families that their savings are safe in FDIC banks! Withdraw your cash right now before the automated bank run locks everyone out forever!",
+        "label": 1
+    }
+]
+
+def generate_augmented_dataset(target_samples=300):
+    """
+    Expands the seed dataset systematically using style and topic templates
+    to ensure ample training and evaluation samples for machine learning models.
+    """
+    np.random.seed(42)
+    rows = list(CURATED_DATA)
+
+    # Topic lists for generating realistic and sensationalistic variants
+    topics_real = [
+        ("Central Bank", "Adjusts Reserve Ratios To Stabilize Commercial Lending Rates",
+         "The financial regulatory board stated that liquidity measures will protect regional lenders while preserving financial stability.",
+         "Economists at leading financial institutes confirmed that the policy adjustments will balance lending rates."),
+        ("Medical Researchers", "Publish Phase III Clinical Trial Findings for Novel Immunotherapy",
+         "The randomized double-blind clinical trial demonstrated a 28 percent improvement in progression-free survival among oncology patients.",
+         "Principal investigators emphasized that the peer-reviewed results warrant regulatory submission to the FDA."),
+        ("Department of Transportation", "Allocates Infrastructure Grants for Rail Safety Modernization",
+         "The grant distribution will fund automated signaling upgrades and track repairs across twelve regional railway systems.",
+         "Safety administrators stated that modernized track sensors reduce collision risks and enhance cargo throughput."),
+        ("Environmental Agency", "Enforces Stricter Industrial Water Discharge Limitations",
+         "New industrial standards require manufacturing plants to reduce heavy metal concentrations in wastewater by 40 percent.",
+         "Agency officials noted that long-term municipal watershed monitoring showed measurable ecological recovery."),
+        ("Telecommunications Consortium", "Completes Subsea Fiber Cable Connecting Pacific Coastal Hubs",
+         "The trans-Pacific fiber optic cable will double high-speed bandwidth connectivity between regional data facilities.",
+         "Engineers confirmed successful packet latency testing meeting all international telecommunication criteria."),
+        ("Agricultural Department", "Forecasts Bumper Grain Yields Following Favorable Seasonal Rainfall",
+         "Domestic agricultural output is projected to rise 6 percent this harvest season due to consistent soil moisture levels.",
+         "Agricultural economists noted that stabilized grain reserves will ease grocery commodity prices for consumers."),
+        ("Aviation Safety Board", "Releases Preliminary Findings on Commercial Airliner Divert Incident",
+         "Investigative authorities stated that redundant electronic control computers functioned as designed following hydraulic pressure loss.",
+         "Flight safety inspectors commended the crew's adherence to standard operating checklist procedures."),
+        ("Renewable Energy Firm", "Commissions 400-Megawatt Offshore Wind Installation",
+         "The offshore wind farm will supply clean electricity to approximately 250,000 residential households annually.",
+         "Project engineers noted that turbine foundations were engineered to minimize marine acoustic disturbances."),
+        ("Cybersecurity Agency", "Issues Technical Advisory Regarding Firmware Vulnerabilities",
+         "Network security administrators are advised to deploy patches addressing privilege escalation risks in enterprise routers.",
+         "Federal cybersecurity directors noted that no active exploitation had been verified prior to coordinated disclosure.")
+    ]
+
+    topics_fake = [
+        ("SECRET WHISTLEBLOWER EXPOSES", "Hidden Satellite Network Will Zap Non-Compliant Citizens",
+         "AN UNBELIEVABLE LEAK HAS PROVEN THAT SHADOW ELITES ARE CONTROLLING THE ENTIRE CONTINENT WITH DEADLY FREQUENCIES!",
+         "WAKE UP AND SHARE THIS SENSATIONAL REPORT BEFORE IT IS ERASED FROM ALL INTERNET SERVERS!"),
+        ("DOCTORS STUNNED", "Ancient Lemon Peel Cure Erases Diabetes in 48 Hours, Hospitals FURIOUS",
+         "BIG PHARMA HAS BEEN SUING SCIENTISTS TO KEEP THIS 100% NATURAL MIRACLE RECIPE A SECRET FROM FAMILIES!",
+         "DO NOT LET GREEDY BILLIONAIRES HIDE THIS MIRACLE JUICE FROM YOU! CLICK TO WATCH THE CENSORED VIDEO!"),
+        ("BOMBSHELL EVIDENCE", "Elections Worldwide Rigged By Artificial Quantum Supercomputer Hidden in Cave",
+         "DEEP STATE PLANNERS HAVE BEEN CAUGHT ON CAMERA LAUGHING ABOUT RIGGING EVERY SINGLE VOTE WITH SECRET SATELLITES!",
+         "THE MAINSTREAM MEDIA IS DESPERATELY TRYING TO COVER UP THE TERRIFYING TRUTH FROM THE SHEEPLE!"),
+        ("UNBELIEVABLE DISCOVERY", "Giants Discovered Living Inside Mount Everest, Military Seals Off Mountain",
+         "TOURISTS WHO TOOK PHOTOGRAPHS HAD THEIR CELL PHONES CONFISCATED BY BLACK HELICOPTER COMMANDOS!",
+         "INSIDERS CONFIRM SCIENTISTS WERE FORCED TO SIGN NON-DISCLOSURE AGREEMENTS UNDER THREAT OF DEATH!"),
+        ("WARNING ALERT", "New Microwave Oven Radiation Is Altering Thoughts and Forcing Obedience",
+         "DO NOT HEAT YOUR FOOD ANYMORE! TOP SECRET DOCUMENTS SHOW HOUSEHOLD APPLIANCES ARE TUNED TO HYPNOTIZE FAMILIES!",
+         "THE GOVERNMENT DOES NOT WANT YOU TO KNOW THIS! UNPLUG YOUR KITCHEN RIGHT NOW!"),
+        ("SHOCKING CONSPIRACY", "Billionaires Caught Buying Underground Bunkers Ahead of Secret Comet Impact",
+         "NASA HAS CENSORED ALL TELESCOPES BECAUSE A DOOMSDAY ASTEROID IS HEADED STRAIGHT FOR EARTH NEXT WEEK!",
+         "SPREAD THE WORD TO EVERY PATRIOT YOU KNOW BEFORE THE INTERNET BLACKOUT BEGINS!"),
+        ("MIRACLE DISCOVERY", "Rub This Weird Household Paste On Your Joints To Cure Arthritis Forever",
+         "CORRUPT SURGEONS ARE BEGGING SENATORS TO BAN THIS 50 CENT REMEDY BECAUSE THEY WILL GO BANKRUPT!",
+         "OVER 100,000 PEOPLE HAVE THROWN AWAY THEIR WALKING CANES IN JUST THREE DAYS!"),
+        ("BREAKING LEAK", "Deep State Spies Caught Poisoning Public Reservoirs With Submissive Chemicals",
+         "WHY ARE PEOPLE SUDDENLY AGREEING WITH HIGHER TAXES? BECAUSE MIND NUMBING DRUGS ARE IN THE TAP WATER!",
+         "BUY REVERSE OSMOSIS PURIFIERS TODAY BEFORE YOUR MIND IS PERMANENTLY NUMBED BY THE SYSTEM!")
+    ]
+
+    while len(rows) < target_samples:
+        # Generate real sample
+        org, headline_action, body1, body2 = topics_real[np.random.randint(0, len(topics_real))]
+        real_title = f"{org} {headline_action}"
+        real_text = f"According to formal briefings released yesterday, {org.lower()} representatives confirmed that {body1.lower()} {body2} Dr. Robert Williams, senior policy advisor, stated that ongoing collaboration will ensure compliance with institutional guidelines and federal standards. Industry monitors affirmed that official documentation is publicly accessible via administrative portals."
+        rows.append({"title": real_title, "text": real_text, "label": 0})
+
+        if len(rows) >= target_samples:
+            break
+
+        # Generate fake sample
+        f_prefix, f_headline, f_body1, f_body2 = topics_fake[np.random.randint(0, len(topics_fake))]
+        fake_title = f"{f_prefix}: {f_headline}!"
+        fake_text = f"{f_body1} Anonymous insiders who risked their lives to smuggle out the classified files confirmed that {f_body2} Why won't corrupt corporate networks report this? Because they are paid off by shadow conglomerates! Protect your loved ones and forward this emergency message to at least ten people immediately!"
+        rows.append({"title": fake_title, "text": fake_text, "label": 1})
+
+    df = pd.DataFrame(rows)
+    # Shuffle
+    df = df.sample(frac=1.0, random_state=42).reset_index(drop=True)
+    return df
+
+def main():
+    os.makedirs("data/raw", exist_ok=True)
+    os.makedirs("data/processed", exist_ok=True)
+    
+    output_raw = os.path.join("data", "raw", "news_dataset.csv")
+    df = generate_augmented_dataset(target_samples=350)
+    df.to_csv(output_raw, index=False)
+    print(f"[SUCCESS] Curated balanced dataset created at: {output_raw}")
+    print(f"Total samples: {len(df)} | Genuine (0): {(df['label'] == 0).sum()} | Fake (1): {(df['label'] == 1).sum()}")
+
+if __name__ == "__main__":
+    main()
